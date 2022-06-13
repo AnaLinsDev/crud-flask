@@ -1,7 +1,27 @@
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_httpauth import HTTPBasicAuth
 from flask import Response, request
 from models.User import *
 from app import app
 import json
+
+auth = HTTPBasicAuth()
+users = {}
+
+# Auth Methods
+
+@auth.verify_password
+def verify_password(email, password):
+    user = User.query.filter_by(email=email).first()
+    if check_password_hash(user.password, password):
+        return email
+
+@app.route("/login")
+@auth.login_required
+def login():
+    return "Hello, %s!" % auth.current_user()
+
+# User Methods
 
 @app.route("/users", methods=["GET"])
 def get_all_users():
@@ -21,7 +41,8 @@ def get_user_by_id(id):
 def create_user():
     body = request.get_json()
     try:
-        user = User(name=body["name"], email= body["email"])
+        password = generate_password_hash(body["password"])
+        user = User(name=body["name"], email= body["email"], password= password)
         db.session.add(user)
         db.session.commit()
         return generate_response(201, "user", user.to_json(), "Created !!")
@@ -41,6 +62,8 @@ def update_user(id):
             user.name = body['name']
         if('email' in body):
             user.email = body['email']
+        if('password' in body):
+            user.password = body['password']
         
         db.session.add(user)
         db.session.commit()
@@ -52,7 +75,7 @@ def update_user(id):
 
 
 @app.route("/user/<id>", methods=["DELETE"])
-def delete_usero(id):
+def delete_user(id):
     user = User.query.filter_by(id=id).first()
 
     try:
